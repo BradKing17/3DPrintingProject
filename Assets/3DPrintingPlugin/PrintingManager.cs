@@ -102,6 +102,7 @@ public class PrintingManager : MonoBehaviour
         selectedRend.materials = tempMats;
         selectedObj = null;
         selectedRend = null;
+        centreOfMassSprite.enabled = false;
         inspectorUI.enabled = false;
 
     }
