@@ -1,21 +1,34 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PrintingManager : MonoBehaviour
 {
+    //Main Variables
+    Canvas inspectorUI = null; 
+    Camera mainCam = null;
+
+    //Object Selection
     public GameObject selectedObj = null;
     Renderer selectedRend = null;
-
-    public Material vertexMat = null;
     public Material outlineMat = null;
+
+
+    //Vertex Shader
+    public Material vertexMat = null;
     Material baseMat = null;
 
+    //Physics and Centre of Mass
+    public Image centreOfMassSprite = null; 
 
     // Start is called before the first frame update
     void Start()
     {
-        
+        inspectorUI = GameObject.Find("3DUI").GetComponent<Canvas>();
+        inspectorUI.enabled = false; 
+        mainCam = Camera.main;
+        centreOfMassSprite.enabled = false;
     }
 
     // Update is called once per frame
@@ -43,6 +56,7 @@ public class PrintingManager : MonoBehaviour
                         selectedObj = hit.collider.gameObject;
                         selectedRend = selectedObj.GetComponent<Renderer>();
                         Debug.Log("Clicked on: " + selectedObj);
+                        inspectorUI.enabled = true;
                         SetOutline();
                     }
                 }
@@ -56,6 +70,7 @@ public class PrintingManager : MonoBehaviour
             }
         }
     }
+    //Show outline on selection
     void SetOutline()
     {
         Material[] tempMats = selectedRend.materials;
@@ -66,10 +81,20 @@ public class PrintingManager : MonoBehaviour
 
     public void AssignVertexMaterial()
     {
-        
         selectedRend.material = vertexMat;
     }
 
+    public void ShowCentreOfMass()
+    {
+        Rigidbody rb; 
+        if (!selectedObj.GetComponent<Rigidbody>())
+        { selectedObj.AddComponent<Rigidbody>(); }
+        rb = selectedObj.GetComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.FreezeAll;
+        centreOfMassSprite.enabled = true;
+        centreOfMassSprite.rectTransform.position = mainCam.WorldToScreenPoint(rb.worldCenterOfMass);
+    }
     void UnassignSelectedObject()
     {
         Debug.Log("Doing it");
@@ -77,6 +102,8 @@ public class PrintingManager : MonoBehaviour
         selectedRend.materials = tempMats;
         selectedObj = null;
         selectedRend = null;
+        inspectorUI.enabled = false;
+
     }
 }
 
