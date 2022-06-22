@@ -13,6 +13,8 @@ public class PrintingManager : MonoBehaviour
     public GameObject selectedObj = null;
     Renderer selectedRend = null;
     public Material outlineMat = null;
+    public List<Vector3> objVerts;
+    public Vector3 lowestPointOnMesh;
 
 
     //Vertex Shader
@@ -57,6 +59,12 @@ public class PrintingManager : MonoBehaviour
                         selectedRend = selectedObj.GetComponent<Renderer>();
                         Debug.Log("Clicked on: " + selectedObj);
                         inspectorUI.enabled = true;
+                        Vector3[] localVerts = selectedObj.GetComponent<MeshFilter>().mesh.vertices;
+                        foreach(Vector3 vert in localVerts)
+                        {
+                            objVerts.Add(selectedObj.transform.TransformPoint(vert));
+                        }
+                                               
                         SetOutline();
                     }
                 }
@@ -69,6 +77,14 @@ public class PrintingManager : MonoBehaviour
                 }
             }
         }
+        //Update CoM Sprite pos
+        Rigidbody rb;
+        if (!selectedObj.GetComponent<Rigidbody>())
+        { selectedObj.AddComponent<Rigidbody>(); }
+        rb = selectedObj.GetComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.constraints = RigidbodyConstraints.FreezeAll;
+        centreOfMassSprite.rectTransform.position = mainCam.WorldToScreenPoint(rb.worldCenterOfMass);
     }
     //Show outline on selection
     void SetOutline()
@@ -86,15 +102,26 @@ public class PrintingManager : MonoBehaviour
 
     public void ShowCentreOfMass()
     {
-        Rigidbody rb; 
-        if (!selectedObj.GetComponent<Rigidbody>())
-        { selectedObj.AddComponent<Rigidbody>(); }
-        rb = selectedObj.GetComponent<Rigidbody>();
-        rb.useGravity = false;
-        rb.constraints = RigidbodyConstraints.FreezeAll;
         centreOfMassSprite.enabled = true;
-        centreOfMassSprite.rectTransform.position = mainCam.WorldToScreenPoint(rb.worldCenterOfMass);
     }
+
+    public void FindBaseOfMesh()
+    {
+        lowestPointOnMesh = objVerts[0];
+        float lowestYPos = lowestPointOnMesh.y;
+
+        foreach (Vector3 vert in objVerts)
+        {
+            if(vert.y < lowestYPos)
+            {
+                lowestPointOnMesh = vert;
+                lowestYPos = vert.y;
+            }
+           
+        }
+        Debug.Log(lowestPointOnMesh);
+    }
+
     void UnassignSelectedObject()
     {
         Debug.Log("Doing it");
@@ -102,9 +129,17 @@ public class PrintingManager : MonoBehaviour
         selectedRend.materials = tempMats;
         selectedObj = null;
         selectedRend = null;
+        objVerts.Clear();
         centreOfMassSprite.enabled = false;
         inspectorUI.enabled = false;
+    }
 
+
+
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.blue;
+        Gizmos.DrawSphere(lowestPointOnMesh, 0.1f);
     }
 }
 
