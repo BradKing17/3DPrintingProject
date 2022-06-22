@@ -13,8 +13,8 @@ public class PrintingManager : MonoBehaviour
     public GameObject selectedObj = null;
     Renderer selectedRend = null;
     public Material outlineMat = null;
-    public List<Vector3> objVerts;
-    public Vector3 lowestPointOnMesh;
+
+
 
 
     //Vertex Shader
@@ -22,7 +22,16 @@ public class PrintingManager : MonoBehaviour
     Material baseMat = null;
 
     //Physics and Centre of Mass
-    public Image centreOfMassSprite = null; 
+    public Image centreOfMassSprite = null;
+
+    //Base of Mesh
+    public List<Vector3> objVerts;
+    public Vector3[] localVerts; 
+    public Vector3 lowestPointOnMesh;
+    public List<Vector3> lowestPointsOnMesh;
+    public float baseTolerance = 0.2f;
+    public float baseSize = 2.0f;
+    public int minNumOfBasePoints = 2;
 
     // Start is called before the first frame update
     void Start()
@@ -59,7 +68,7 @@ public class PrintingManager : MonoBehaviour
                         selectedRend = selectedObj.GetComponent<Renderer>();
                         Debug.Log("Clicked on: " + selectedObj);
                         inspectorUI.enabled = true;
-                        Vector3[] localVerts = selectedObj.GetComponent<MeshFilter>().mesh.vertices;
+                        localVerts = selectedObj.GetComponent<MeshFilter>().mesh.vertices;
                         foreach(Vector3 vert in localVerts)
                         {
                             objVerts.Add(selectedObj.transform.TransformPoint(vert));
@@ -119,7 +128,30 @@ public class PrintingManager : MonoBehaviour
             }
            
         }
-        Debug.Log(lowestPointOnMesh);
+        lowestPointsOnMesh.Add(lowestPointOnMesh);
+
+        for(int i = 0; i < objVerts.Count; i++)
+        {
+            if(objVerts[i].y < lowestYPos + baseTolerance)
+            {
+                Debug.Log(Vector3.Dot(selectedObj.transform.TransformDirection(localVerts[i]), Vector3.up));
+                if (Vector3.Dot(selectedObj.transform.TransformDirection(localVerts[i]), Vector3.up) < -0.5f)
+                {
+                    
+                    lowestPointsOnMesh.Add(objVerts[i]);
+                }
+            }
+        }
+
+        if(lowestPointsOnMesh.Count < minNumOfBasePoints)
+        {
+            GenerateBase();
+        }
+    }
+
+    void GenerateBase()
+    {
+        Debug.Log("Generating Base");
     }
 
     void UnassignSelectedObject()
@@ -138,8 +170,11 @@ public class PrintingManager : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        Gizmos.color = Color.blue;
-        Gizmos.DrawSphere(lowestPointOnMesh, 0.1f);
+        foreach (Vector3 vert in lowestPointsOnMesh)
+        {
+            Gizmos.color = Color.blue;
+            Gizmos.DrawSphere(vert, 0.01f);
+        }
     }
 }
 
