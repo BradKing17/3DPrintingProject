@@ -13,9 +13,7 @@ public class PrintingManager : MonoBehaviour
     public GameObject selectedObj = null;
     Renderer selectedRend = null;
     public Material outlineMat = null;
-
-
-
+    public GameObject[] objects; 
 
     //Vertex Shader
     public Material vertexMat = null;
@@ -25,13 +23,26 @@ public class PrintingManager : MonoBehaviour
     public Image centreOfMassSprite = null;
 
     //Base of Mesh
-    public List<Vector3> objVerts;
-    public Vector3[] localVerts; 
-    public Vector3 lowestPointOnMesh;
+    [HideInInspector]public List<Vector3> objVerts;
+    [HideInInspector] public Vector3[] localVerts;
+    [HideInInspector] public Vector3 lowestPointOnMesh;
     public List<Vector3> lowestPointsOnMesh;
     public float baseTolerance = 0.2f;
-    public float baseSize = 2.0f;
     public int minNumOfBasePoints = 2;
+    public float floorHeight = 0.0f;
+    public bool isFloating = false;
+
+    //Base Settings
+    public float baseSize = 2.0f;
+    public float baseHeight = 0.1f;
+    public int baseDetail = 8;
+    public List<Vector3> newVerts = default;
+
+    //Mesh Cutting
+    public float minMeshWidth = 0.05f;
+    public float meshHeight = 0.0f;
+    public Vector3 highestPointOnMesh;
+    public GameObject slicingPlane;
 
     // Start is called before the first frame update
     void Start()
@@ -54,6 +65,8 @@ public class PrintingManager : MonoBehaviour
             Debug.Log("Pressed");
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
+
+
             if (Physics.Raycast(ray, out hit))
             {
                 if (hit.collider != null)
@@ -134,24 +147,92 @@ public class PrintingManager : MonoBehaviour
         {
             if(objVerts[i].y < lowestYPos + baseTolerance)
             {
-                Debug.Log(Vector3.Dot(selectedObj.transform.TransformDirection(localVerts[i]), Vector3.up));
                 if (Vector3.Dot(selectedObj.transform.TransformDirection(localVerts[i]), Vector3.up) < -0.5f)
                 {
-                    
-                    lowestPointsOnMesh.Add(objVerts[i]);
+                    if (!lowestPointsOnMesh.Contains(objVerts[i]))
+                    {
+                        lowestPointsOnMesh.Add(objVerts[i]);
+                    }
                 }
             }
         }
-
+        
+        if(lowestPointOnMesh.y > floorHeight)
+        {
+            isFloating = true;
+        }
         if(lowestPointsOnMesh.Count < minNumOfBasePoints)
         {
-            GenerateBase();
+            if (!isFloating)
+            {
+                GenerateBase();
+            }
         }
     }
 
     void GenerateBase()
     {
         Debug.Log("Generating Base");
+
+        GameObject objBase = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        objBase.transform.position = new Vector3(lowestPointOnMesh.x, lowestPointOnMesh.y - baseHeight, lowestPointOnMesh.z);
+        objBase.transform.localScale = new Vector3(baseSize, baseHeight, baseSize);
+
+        //Mesh baseMesh = new Mesh();
+        
+        //int[] newTris;
+        //Vector3 bottomOfBase = new Vector3(lowestPointOnMesh.x, lowestPointOnMesh.y - baseHeight, lowestPointOnMesh.z);
+        //Debug.Log(bottomOfBase);
+        //newVerts.Add(bottomOfBase);
+
+        ////Bottom circle
+        //for(int i = 0; i < baseDetail; i++)
+        //{
+        //    float theta = i * 2 * Mathf.PI / baseDetail;
+        //    float x = Mathf.Sin(theta) * baseSize;
+        //    float z = Mathf.Cos(theta) * baseSize;
+        //    Vector3 newPoint = new Vector3(bottomOfBase.x + x, bottomOfBase.y, bottomOfBase.z + z);
+        //    newVerts.Add(newPoint);
+        //}
+        ////Top circle
+        //for (int i = 0; i < baseDetail; i++)
+        //{
+        //    float theta = i * 2 * Mathf.PI / baseDetail;
+        //    float x = Mathf.Sin(theta) * baseSize;
+        //    float z = Mathf.Cos(theta) * baseSize;
+        //    Vector3 newPoint = new Vector3(lowestPointOnMesh.x + x, lowestPointOnMesh.y, lowestPointOnMesh.z + z);
+        //    newVerts.Add(newPoint);
+        //}
+
+        //newTris = GenerateTris();
+
+        //GetComponent<MeshFilter>().mesh = baseMesh;
+        //baseMesh.vertices = newVerts.ToArray();
+        //baseMesh.triangles = newTris;
+
+        
+    }
+
+    void SliceMesh()
+    {
+        float highestYPos = 0.0f;
+        foreach (Vector3 vert in objVerts)
+        {
+            if (vert.y > highestYPos)
+            {
+                highestPointOnMesh = vert;
+                highestYPos = vert.y;
+            }
+
+            var dir = vert - slicingPlane.transform.position;
+            if(Vector3.Dot(slicingPlane.transform.up, dir) > 0)
+            {
+               
+            }
+
+        }
+        meshHeight = highestPointOnMesh.y - lowestPointOnMesh.y;
+
     }
 
     void UnassignSelectedObject()

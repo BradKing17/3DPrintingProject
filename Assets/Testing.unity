@@ -1806,10 +1806,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   selectedObj: {fileID: 0}
   outlineMat: {fileID: 2100000, guid: 3379d7f8c300f35448bea8df2d9b7e0f, type: 2}
-  objVerts: []
-  lowestPointOnMesh: {x: 0, y: 0, z: 0}
+  objects: []
   vertexMat: {fileID: 2100000, guid: 71905bc225ed8704489435959e0d5e49, type: 2}
   centreOfMassSprite: {fileID: 1878359756}
+  objVerts: []
+  localVerts: []
+  lowestPointOnMesh: {x: 0, y: 0, z: 0}
+  lowestPointsOnMesh: []
+  baseTolerance: 0.2
+  minNumOfBasePoints: 10
+  floorHeight: 1
+  isFloating: 0
+  baseSize: 2
+  baseHeight: 0.1
+  baseDetail: 8
+  newVerts: []
+  minMeshWidth: 0.05
+  meshHeight: 0
+  highestPointOnMesh: {x: 0, y: 0, z: 0}
+  slicingPlane: {fileID: 0}
 --- !u!4 &1615637094
 Transform:
   m_ObjectHideFlags: 0
