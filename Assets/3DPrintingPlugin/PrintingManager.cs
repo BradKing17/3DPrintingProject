@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,44 +6,50 @@ using UnityEngine.UI;
 
 public class PrintingManager : MonoBehaviour
 {
-    //Main Variables
+    //References
     Canvas inspectorUI = null; 
     Camera mainCam = null;
+    public GameObject slicingPlane;
 
-    //Object Selection
+    [Header("---Object Selection---")]
     public GameObject selectedObj = null;
     Renderer selectedRend = null;
+    public Mesh selectedMesh = null;
     public Material outlineMat = null;
-    public GameObject[] objects; 
+    public GameObject[] objects;
 
-    //Vertex Shader
+    [Header("---Overhang Detection---")]
     public Material vertexMat = null;
     Material baseMat = null;
 
-    //Physics and Centre of Mass
+    [Header("---Centre of Mass---")]
     public Image centreOfMassSprite = null;
 
-    //Base of Mesh
-    [HideInInspector]public List<Vector3> objVerts;
-    [HideInInspector] public Vector3[] localVerts;
-    [HideInInspector] public Vector3 lowestPointOnMesh;
-    public List<Vector3> lowestPointsOnMesh;
+    
+    
+    [Header("---Base Detection---")]
     public float baseTolerance = 0.2f;
     public int minNumOfBasePoints = 2;
     public float floorHeight = 0.0f;
     public bool isFloating = false;
+    [HideInInspector] public List<Vector3> objVerts;
+    [HideInInspector] public Vector3[] localVerts;
+    [HideInInspector] public Vector3 lowestPointOnMesh;
+    [HideInInspector] public List<Vector3> lowestPointsOnMesh;
 
-    //Base Settings
+    [Header("---Base Settings---")]
     public float baseSize = 2.0f;
     public float baseHeight = 0.1f;
-    public int baseDetail = 8;
-    public List<Vector3> newVerts = default;
 
-    //Mesh Cutting
+    [Header("---Mesh Cutting---")]
     public float minMeshWidth = 0.05f;
     public float meshHeight = 0.0f;
     public Vector3 highestPointOnMesh;
-    public GameObject slicingPlane;
+    public Material slicingMat;
+    [HideInInspector] public List<Vector3> slicedVerts;
+    public List<Tuple<Vector3, Vector3>> intersectedEdges = new List<Tuple<Vector3, Vector3>>();
+    public List<Vector3> intersections = default;
+
 
     // Start is called before the first frame update
     void Start()
@@ -56,11 +63,11 @@ public class PrintingManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if(Input.GetButtonDown("Testremove"))
+        if (Input.GetButtonDown("Testremove"))
         {
             UnassignSelectedObject();
         }
-        if(Input.GetButtonDown("Select"))
+        if (Input.GetButtonDown("Select"))
         {
             Debug.Log("Pressed");
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -81,12 +88,15 @@ public class PrintingManager : MonoBehaviour
                         selectedRend = selectedObj.GetComponent<Renderer>();
                         Debug.Log("Clicked on: " + selectedObj);
                         inspectorUI.enabled = true;
-                        localVerts = selectedObj.GetComponent<MeshFilter>().mesh.vertices;
-                        foreach(Vector3 vert in localVerts)
+                        selectedMesh = selectedObj.GetComponent<MeshFilter>().mesh;
+                        localVerts = selectedMesh.vertices;
+                        foreach (Vector3 vert in localVerts)
                         {
-                            objVerts.Add(selectedObj.transform.TransformPoint(vert));
+                            if (!objVerts.Contains(selectedObj.transform.TransformPoint(vert)))
+                            {
+                                objVerts.Add(selectedObj.transform.TransformPoint(vert));
+                            }
                         }
-                                               
                         SetOutline();
                     }
                 }
@@ -100,13 +110,16 @@ public class PrintingManager : MonoBehaviour
             }
         }
         //Update CoM Sprite pos
-        Rigidbody rb;
-        if (!selectedObj.GetComponent<Rigidbody>())
-        { selectedObj.AddComponent<Rigidbody>(); }
-        rb = selectedObj.GetComponent<Rigidbody>();
-        rb.useGravity = false;
-        rb.constraints = RigidbodyConstraints.FreezeAll;
-        centreOfMassSprite.rectTransform.position = mainCam.WorldToScreenPoint(rb.worldCenterOfMass);
+        if (selectedObj)
+        { 
+            Rigidbody rb;
+            if (!selectedObj.GetComponent<Rigidbody>())
+            { selectedObj.AddComponent<Rigidbody>(); }
+            rb = selectedObj.GetComponent<Rigidbody>();
+            rb.useGravity = false;
+            rb.constraints = RigidbodyConstraints.FreezeAll;
+            centreOfMassSprite.rectTransform.position = mainCam.WorldToScreenPoint(rb.worldCenterOfMass);
+        }
     }
     //Show outline on selection
     void SetOutline()
@@ -213,24 +226,44 @@ public class PrintingManager : MonoBehaviour
         
     }
 
-    void SliceMesh()
+    public void SliceMesh()
     {
         float highestYPos = 0.0f;
         foreach (Vector3 vert in objVerts)
         {
+            //Find highest point on mesh
             if (vert.y > highestYPos)
             {
                 highestPointOnMesh = vert;
                 highestYPos = vert.y;
             }
 
+            //Find all verts above slicer plane
             var dir = vert - slicingPlane.transform.position;
             if(Vector3.Dot(slicingPlane.transform.up, dir) > 0)
             {
-               
+                slicingMat.SetFloat(0, Vector3.Dot(slicingPlane.transform.up, dir));
+                slicedVerts.Add(vert);
             }
 
+
         }
+
+        //Find edges that intersect with plane 
+        for(int i = 1; i < objVerts.Count; i++)
+        {
+            if (slicedVerts.Contains(objVerts[i]) ^ slicedVerts.Contains(objVerts[i-1]))
+            {
+                intersectedEdges.Add(Tuple.Create(objVerts[i], objVerts[i-1]));
+                Debug.Log(intersectedEdges[0].Item1 + " : " + intersectedEdges[0].Item2);
+
+                float k = Vector3.Dot(slicingPlane.transform.position - objVerts[i], slicingPlane.transform.up) / Vector3.Dot(objVerts[i + 1] - objVerts[i], slicingPlane.transform.up);
+                Debug.Log(k);
+                intersections.Add(objVerts[i] + (objVerts[i + 1] - objVerts[i] * k));
+
+            }
+        }
+
         meshHeight = highestPointOnMesh.y - lowestPointOnMesh.y;
 
     }
@@ -251,9 +284,8 @@ public class PrintingManager : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        foreach (Vector3 vert in lowestPointsOnMesh)
+        foreach(Vector3 vert in intersections)
         {
-            Gizmos.color = Color.blue;
             Gizmos.DrawSphere(vert, 0.01f);
         }
     }
