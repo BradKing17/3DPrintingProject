@@ -32,7 +32,7 @@ public class PrintingManager : MonoBehaviour
     public int minNumOfBasePoints = 2;
     public float floorHeight = 0.0f;
     public bool isFloating = false;
-    [HideInInspector] public List<Vector3> objVerts;
+    public List<Vector3> objVerts;
     [HideInInspector] public Vector3[] localVerts;
     [HideInInspector] public Vector3 lowestPointOnMesh;
     [HideInInspector] public List<Vector3> lowestPointsOnMesh;
@@ -47,7 +47,7 @@ public class PrintingManager : MonoBehaviour
     public Vector3 highestPointOnMesh;
     public Material slicingMat;
     [HideInInspector] public List<Vector3> slicedVerts;
-    public List<Tuple<Vector3, Vector3>> intersectedEdges = new List<Tuple<Vector3, Vector3>>();
+    public List<(Vector3, Vector3)> intersectedEdges = new List<(Vector3, Vector3)>();
     public List<Vector3> intersections = default;
 
 
@@ -245,25 +245,41 @@ public class PrintingManager : MonoBehaviour
                 slicingMat.SetFloat(0, Vector3.Dot(slicingPlane.transform.up, dir));
                 slicedVerts.Add(vert);
             }
-
-
         }
 
         //Find edges that intersect with plane 
-        for(int i = 1; i < objVerts.Count; i++)
+        for (int i = 0; i < selectedMesh.triangles.Length; i += 3)
         {
-            if (slicedVerts.Contains(objVerts[i]) ^ slicedVerts.Contains(objVerts[i-1]))
+            Vector3 p1 = objVerts[selectedMesh.triangles[i + 0]];
+            Vector3 p2 = objVerts[selectedMesh.triangles[i + 1]];
+            Vector3 p3 = objVerts[selectedMesh.triangles[i + 2]];
+
+            if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p2))
             {
-                intersectedEdges.Add(Tuple.Create(objVerts[i], objVerts[i-1]));
-                Debug.Log(intersectedEdges[0].Item1 + " : " + intersectedEdges[0].Item2);
-
-                float k = Vector3.Dot(slicingPlane.transform.position - objVerts[i], slicingPlane.transform.up) / Vector3.Dot(objVerts[i + 1] - objVerts[i], slicingPlane.transform.up);
-                Debug.Log(k);
-                intersections.Add(objVerts[i] + (objVerts[i + 1] - objVerts[i] * k));
-
+                intersectedEdges.Add((p1,p2));
+            }
+            if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p3))
+            {
+                intersectedEdges.Add((p1, p3));
+            }
+            if (slicedVerts.Contains(p2) ^ slicedVerts.Contains(p3))
+            {
+                intersectedEdges.Add((p3, p3));
             }
         }
+        //Find point of intersection for each edge
+        foreach (var edge in intersectedEdges)
+        {
+            Debug.Log(edge);
+            Ray ray = new Ray(edge.Item1, (edge.Item2 - edge.Item1));
+            Plane plane = new Plane(slicingPlane.transform.up, 0);
+            plane.SetNormalAndPosition(slicingPlane.transform.up, slicingPlane.transform.position);
+            plane.Raycast(ray, out float distance);
 
+            intersections.Add(ray.GetPoint(distance));
+            Debug.Log(ray.GetPoint(distance));
+
+        }
         meshHeight = highestPointOnMesh.y - lowestPointOnMesh.y;
 
     }
@@ -284,7 +300,7 @@ public class PrintingManager : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        foreach(Vector3 vert in intersections)
+        foreach (Vector3 vert in intersections )
         {
             Gizmos.DrawSphere(vert, 0.01f);
         }
