@@ -48,7 +48,9 @@ public class PrintingManager : MonoBehaviour
     public Material slicingMat;
     [HideInInspector] public List<Vector3> slicedVerts;
     public List<(Vector3, Vector3)> intersectedEdges = new List<(Vector3, Vector3)>();
+    public List<(Vector3, Vector3)> allEdges = new List<(Vector3, Vector3)>();
     public List<Vector3> intersections = default;
+    public LineRenderer crossSectionRenderer = default;
 
 
     // Start is called before the first frame update
@@ -92,10 +94,9 @@ public class PrintingManager : MonoBehaviour
                         localVerts = selectedMesh.vertices;
                         foreach (Vector3 vert in localVerts)
                         {
-                            if (!objVerts.Contains(selectedObj.transform.TransformPoint(vert)))
-                            {
+                           
                                 objVerts.Add(selectedObj.transform.TransformPoint(vert));
-                            }
+                        
                         }
                         SetOutline();
                     }
@@ -190,44 +191,11 @@ public class PrintingManager : MonoBehaviour
         GameObject objBase = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         objBase.transform.position = new Vector3(lowestPointOnMesh.x, lowestPointOnMesh.y - baseHeight, lowestPointOnMesh.z);
         objBase.transform.localScale = new Vector3(baseSize, baseHeight, baseSize);
-
-        //Mesh baseMesh = new Mesh();
-        
-        //int[] newTris;
-        //Vector3 bottomOfBase = new Vector3(lowestPointOnMesh.x, lowestPointOnMesh.y - baseHeight, lowestPointOnMesh.z);
-        //Debug.Log(bottomOfBase);
-        //newVerts.Add(bottomOfBase);
-
-        ////Bottom circle
-        //for(int i = 0; i < baseDetail; i++)
-        //{
-        //    float theta = i * 2 * Mathf.PI / baseDetail;
-        //    float x = Mathf.Sin(theta) * baseSize;
-        //    float z = Mathf.Cos(theta) * baseSize;
-        //    Vector3 newPoint = new Vector3(bottomOfBase.x + x, bottomOfBase.y, bottomOfBase.z + z);
-        //    newVerts.Add(newPoint);
-        //}
-        ////Top circle
-        //for (int i = 0; i < baseDetail; i++)
-        //{
-        //    float theta = i * 2 * Mathf.PI / baseDetail;
-        //    float x = Mathf.Sin(theta) * baseSize;
-        //    float z = Mathf.Cos(theta) * baseSize;
-        //    Vector3 newPoint = new Vector3(lowestPointOnMesh.x + x, lowestPointOnMesh.y, lowestPointOnMesh.z + z);
-        //    newVerts.Add(newPoint);
-        //}
-
-        //newTris = GenerateTris();
-
-        //GetComponent<MeshFilter>().mesh = baseMesh;
-        //baseMesh.vertices = newVerts.ToArray();
-        //baseMesh.triangles = newTris;
-
-        
     }
 
     public void SliceMesh()
     {
+        intersections.Clear();
         float highestYPos = 0.0f;
         foreach (Vector3 vert in objVerts)
         {
@@ -246,38 +214,40 @@ public class PrintingManager : MonoBehaviour
                 slicedVerts.Add(vert);
             }
         }
-
         //Find edges that intersect with plane 
-        for (int i = 0; i < selectedMesh.triangles.Length; i += 3)
+        for (int i = 0; i < selectedMesh.triangles.Length; i+=3)
         {
-            Vector3 p1 = objVerts[selectedMesh.triangles[i + 0]];
+            Vector3 p1 = objVerts[selectedMesh.triangles[i]];
             Vector3 p2 = objVerts[selectedMesh.triangles[i + 1]];
             Vector3 p3 = objVerts[selectedMesh.triangles[i + 2]];
 
-            if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p2))
-            {
-                intersectedEdges.Add((p1,p2));
-            }
-            if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p3))
-            {
-                intersectedEdges.Add((p1, p3));
-            }
-            if (slicedVerts.Contains(p2) ^ slicedVerts.Contains(p3))
-            {
-                intersectedEdges.Add((p3, p3));
-            }
+
+                if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p2))
+                {
+                    intersectedEdges.Add((p1, p2));
+                }
+                if (slicedVerts.Contains(p1) ^ slicedVerts.Contains(p3))
+                {
+                    intersectedEdges.Add((p1, p3));
+                }
+                if (slicedVerts.Contains(p2) ^ slicedVerts.Contains(p3))
+                {
+                    intersectedEdges.Add((p2, p3));
+                }
         }
         //Find point of intersection for each edge
         foreach (var edge in intersectedEdges)
         {
-            Debug.Log(edge);
             Ray ray = new Ray(edge.Item1, (edge.Item2 - edge.Item1));
             Plane plane = new Plane(slicingPlane.transform.up, 0);
             plane.SetNormalAndPosition(slicingPlane.transform.up, slicingPlane.transform.position);
             plane.Raycast(ray, out float distance);
 
             intersections.Add(ray.GetPoint(distance));
-            Debug.Log(ray.GetPoint(distance));
+
+            crossSectionRenderer.enabled = true;
+            crossSectionRenderer.positionCount = intersections.Count;
+            crossSectionRenderer.SetPositions(intersections.ToArray());
 
         }
         meshHeight = highestPointOnMesh.y - lowestPointOnMesh.y;
@@ -294,15 +264,34 @@ public class PrintingManager : MonoBehaviour
         objVerts.Clear();
         centreOfMassSprite.enabled = false;
         inspectorUI.enabled = false;
+        crossSectionRenderer.enabled = false;
     }
 
 
 
     private void OnDrawGizmos()
     {
-        foreach (Vector3 vert in intersections )
+        foreach (Vector3 vert in objVerts)
         {
-            Gizmos.DrawSphere(vert, 0.01f);
+            if (slicedVerts.Contains(vert))
+            {
+                Gizmos.color = Color.red;
+                Gizmos.DrawSphere(vert, 0.01f);
+            }
+            else
+            {
+                Gizmos.color = Color.green;
+                Gizmos.DrawSphere(vert, 0.01f);
+            }
+        }
+
+        for(int i = 0; i <intersections.Count; i++)
+        {
+            Gizmos.color = Color.white;
+            Gizmos.DrawSphere(intersections[i], 0.01f);
+
+            Gizmos.color = Color.blue;
+            Gizmos.DrawLine(intersections[i], intersections[i + 1]);
         }
     }
 }
