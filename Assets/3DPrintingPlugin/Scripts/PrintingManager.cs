@@ -12,7 +12,8 @@ public class PrintingManager : MonoBehaviour
     public GameObject slicingPlane;
 
     [Header("---Object Selection---")]
-    public GameObject selectedObj = null;
+    public LayerMask selectableLayers;
+    [HideInInspector] public GameObject selectedObj = null;
     Renderer selectedRend = null;
     [HideInInspector] public Mesh selectedMesh = null;
     public Material outlineMat = null;
@@ -45,17 +46,17 @@ public class PrintingManager : MonoBehaviour
     public float minMeshWidth = 0.05f;
     public Material slicingMat;
     public LineRenderer crossSectionRenderer = default;
+    public bool isSlicing = false;
+    public float sliceStep = 0.05f;
+    public float sliceTimer = 1.0f;
+    [HideInInspector] public float curSliceTime = 1.0f;
+    [HideInInspector] public float highestYPos = 0.0f;
     [HideInInspector] public float meshHeight = 0.0f;
     [HideInInspector] public Vector3 highestPointOnMesh;
     [HideInInspector] public List<Vector3> slicedVerts;
     [HideInInspector] public List<(Vector3, Vector3)> intersectedEdges = new List<(Vector3, Vector3)>();
     [HideInInspector] public List<(Vector3, Vector3)> allEdges = new List<(Vector3, Vector3)>();
     [HideInInspector] public List<Vector3> intersections = default;
-    public bool isSlicing = false;
-    public float sliceStep = 0.05f;
-    public float sliceTimer = 1.0f;
-    public float curSliceTime = 1.0f;
-    public float highestYPos = 0.0f;
 
 
 
@@ -88,25 +89,28 @@ public class PrintingManager : MonoBehaviour
                 {
                     if (!hit.collider.CompareTag("SlicingPlane"))
                     {
-                        if (selectedObj != hit.collider.gameObject)
+                        if (selectableLayers == (selectableLayers | (1 << hit.collider.gameObject.layer)))
                         {
-                            if (selectedObj)
+                            if (selectedObj != hit.collider.gameObject)
                             {
-                                UnassignSelectedObject();
-                            }
-                            selectedObj = hit.collider.gameObject;
-                            selectedRend = selectedObj.GetComponent<Renderer>();
-                            Debug.Log("Clicked on: " + selectedObj);
-                            inspectorUI.enabled = true;
-                            selectedMesh = selectedObj.GetComponent<MeshFilter>().mesh;
-                            localVerts = selectedMesh.vertices;
-                            foreach (Vector3 vert in localVerts)
-                            {
+                                if (selectedObj)
+                                {
+                                    UnassignSelectedObject();
+                                }
+                                selectedObj = hit.collider.gameObject;
+                                selectedRend = selectedObj.GetComponent<Renderer>();
+                                Debug.Log("Clicked on: " + selectedObj);
+                                inspectorUI.enabled = true;
+                                selectedMesh = selectedObj.GetComponent<MeshFilter>().mesh;
+                                localVerts = selectedMesh.vertices;
+                                foreach (Vector3 vert in localVerts)
+                                {
 
-                                objVerts.Add(selectedObj.transform.TransformPoint(vert));
+                                    objVerts.Add(selectedObj.transform.TransformPoint(vert));
 
+                                }
+                                SetOutline();
                             }
-                            SetOutline();
                         }
                     }
                 }
@@ -172,19 +176,9 @@ public class PrintingManager : MonoBehaviour
     }
     //Find bottom of mesh
     public void FindBaseOfMesh()
-    {
-        lowestPointOnMesh = objVerts[0];
-        float lowestYPos = lowestPointOnMesh.y;
-
-        foreach (Vector3 vert in objVerts)
-        {
-            if(vert.y < lowestYPos)
-            {
-                lowestPointOnMesh = vert;
-                lowestYPos = vert.y;
-            }
-           
-        }
+    { 
+        float lowestYPos = FindLowestPoint();
+        
         lowestPointsOnMesh.Add(lowestPointOnMesh);
 
         for(int i = 0; i < objVerts.Count; i++)
@@ -214,6 +208,23 @@ public class PrintingManager : MonoBehaviour
         }
     }
 
+    float FindLowestPoint()
+    {
+        lowestPointOnMesh = objVerts[0];
+        float lowestYPos = lowestPointOnMesh.y;
+        foreach (Vector3 vert in objVerts)
+        {
+
+            if (vert.y < lowestYPos)
+            {
+                lowestPointOnMesh = vert;
+                lowestYPos = vert.y;
+            }
+        }
+
+        return lowestYPos;
+    }
+
     void GenerateBase()
     {
         Debug.Log("Generating Base");
@@ -225,6 +236,7 @@ public class PrintingManager : MonoBehaviour
 
     public void StartSlice()
     {
+        slicingPlane.transform.SetPositionAndRotation(new Vector3(selectedObj.transform.position.x, FindLowestPoint(), selectedObj.transform.position.z), Quaternion.identity);
         //Find highest point on mesh
         foreach (Vector3 vert in objVerts)
         {
@@ -345,6 +357,7 @@ public class PrintingManager : MonoBehaviour
         objVerts.Clear();
         intersectedEdges.Clear();
         intersections.Clear();
+        isSlicing = false;
         centreOfMassSprite.enabled = false;
         inspectorUI.enabled = false;
         crossSectionRenderer.enabled = false;
